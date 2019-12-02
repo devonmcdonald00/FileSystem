@@ -64,10 +64,10 @@ inode * setupInodes(){
     temp.filesize = 0;
     temp.indirectBlock = 0;
     for(int i = 0; i<12; i++){
-        temp.directBlocks[i] = 0;
+        temp.directBlocks[i] = 0; // initialize 12 direct blocks to 0
     }
     for(int i = 0; i<15; i++){
-        inodeEntries[i] = temp;
+        inodeEntries[i] = temp; // 15 inodes per block
     }
     return inodeEntries;
 }
@@ -77,11 +77,11 @@ fileEntry * setupDirectoryEntries(){
     fileEntry * directoryEntries = malloc(sizeof(fileEntry) * 15);
     fileEntry temp;
     for(int i = 0; i<32 ; i++){
-        temp.name[i] = 65;
+        temp.name[i] = 0; // initialize 32 bytes for file name
     }
     temp.inodeNumber = 0;
     for(int i = 0; i < 15; i++){
-        directoryEntries[i] = temp;
+        directoryEntries[i] = temp; // 15 file entries per block
     }
 
     return directoryEntries;
@@ -102,17 +102,17 @@ int main(){
         dataBitmap = setupDataBitmap();
 
         unsigned char * testData = malloc(sizeof(char) * 512);
-        write_sd_block(dataBitmap, 6);
-        write_sd_block(inodeBitmap, 7);
+        write_sd_block(dataBitmap, 6); // block for data bitmap
+        write_sd_block(inodeBitmap, 7); // block for inode bitmap
 
         //Define Directory Entry with file entries (first 5 blocks)
         fileEntry * inputDirectoryEntries = malloc((sizeof(fileEntry) * 15) + 2);
         inputDirectoryEntries = setupDirectoryEntries();
-        write_sd_block(inputDirectoryEntries, 1);
-        write_sd_block(inputDirectoryEntries, 2);
-        write_sd_block(inputDirectoryEntries, 3);
-        write_sd_block(inputDirectoryEntries, 4);
-        write_sd_block(inputDirectoryEntries, 5);
+        write_sd_block(inputDirectoryEntries, 1); // 1 of 5 FAT blocks
+        write_sd_block(inputDirectoryEntries, 2); // 1 of 5 FAT blocks
+        write_sd_block(inputDirectoryEntries, 3); // 1 of 5 FAT blocks
+        write_sd_block(inputDirectoryEntries, 4); // 1 of 5 FAT blocks
+        write_sd_block(inputDirectoryEntries, 5); // 1 of 5 FAT blocks
         fileEntry * testDirectoryRead = malloc((sizeof(fileEntry)*15)+2);
         read_sd_block(testDirectoryRead, 1);
 
@@ -123,11 +123,11 @@ int main(){
 
         inputInodes = setupInodes();
 
-        write_sd_block(inputInodes, 8);
-        write_sd_block(inputInodes, 9);
-        write_sd_block(inputInodes, 10);
-        write_sd_block(inputInodes, 11);
-        write_sd_block(inputInodes, 12);
+        write_sd_block(inputInodes, 8); // 1 of 5 inode blocks
+        write_sd_block(inputInodes, 9); // 1 of 5 inode blocks
+        write_sd_block(inputInodes, 10); // 1 of 5 inode blocks
+        write_sd_block(inputInodes, 11); // 1 of 5 inode blocks
+        write_sd_block(inputInodes, 12); // 1 of 5 inode blocks
 
         //All metadata finished
 
