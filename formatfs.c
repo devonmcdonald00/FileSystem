@@ -57,37 +57,19 @@ unsigned char * setupInodeBitmap(){
 }
 
 
-inode * setupInodes(int last){
+inode * setupInodes(){
     //inode type is 28 bytes
-    if(last == 0){
-        inode * inodeEntries = malloc(sizeof(inode) * 18);
-        inode temp;
-        temp.filesize = 0;
-        temp.indirectBlock = 0;
-        for(int i = 0; i<12; i++){
-            temp.directBlocks[i] = 0;
-        }
-        for(int i = 0; i<18; i++){
-            inodeEntries[i] = temp;
-        }
-        return inodeEntries;
+    inode * inodeEntries = malloc(sizeof(inode) * 15);
+    inode temp;
+    temp.filesize = 0;
+    temp.indirectBlock = 0;
+    for(int i = 0; i<12; i++){
+        temp.directBlocks[i] = 0;
     }
-    else{
-        //The last block of inodes will only have 3 inodes to make 75 total inodes
-        inode * inodeEntries = malloc(sizeof(inode) * 3);
-        inode temp;
-        temp.filesize = 0;
-        temp.indirectBlock = 0;
-        for(int i = 0; i<3; i++){
-            temp.directBlocks[i] = 0;
-        }
-        for(int i = 0; i<3; i++){
-            inodeEntries[i] = temp;
-        }
-        return inodeEntries;
+    for(int i = 0; i<15; i++){
+        inodeEntries[i] = temp;
     }
-    
-
+    return inodeEntries;
 }
 
 fileEntry * setupDirectoryEntries(){
@@ -137,17 +119,15 @@ int main(){
         printf("\nThe first character of name is %c and should be A\n", testDirectoryRead[0].name[0]);
 
         //Define inode blocks
-        inode * inputInodes = malloc((sizeof(inode)*18) + 8);
-        inode * lastInodes = malloc((sizeof(inode)*3) + 428);
+        inode * inputInodes = malloc((sizeof(inode)*15) + 92);
 
-        inputInodes = setupInodes(0);
-        lastInodes = setupInodes(1);
+        inputInodes = setupInodes();
 
         write_sd_block(inputInodes, 8);
         write_sd_block(inputInodes, 9);
         write_sd_block(inputInodes, 10);
         write_sd_block(inputInodes, 11);
-        write_sd_block(lastInodes, 12);
+        write_sd_block(inputInodes, 12);
 
         //All metadata finished
 
