@@ -119,6 +119,7 @@ int main(){
         read_sd_block(testDirectoryRead, 1);
 
         printf("\nDirectory entries have been setup...\n");
+        //printf("\nThe first character of name is %c and should be A\n", testDirectoryRead[0].name[0]);
 
         //Define inode blocks
         inode * inputInodes = malloc((sizeof(inode)*15) + 92);

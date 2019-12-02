@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <string.h>
+#include <stdbool.h>
 #include "softwaredisk.h"
 #include "filesystem.h"
 //#include "formatfs.c"
@@ -16,6 +18,14 @@ typedef struct{
     unsigned char name[32];
     short inodeNumber;
 }fileEntry;
+
+typedef struct FileInternals {
+    short pos;
+    bool mode; 
+    bool open; //0 if closed, 1 if open
+    fileEntry cacheFileEntry;
+    short blockNum;
+} FileInternals;
 
 // open existing file with pathname 'name' and access mode 'mode'.  Current file
 // position is set at byte 0.  Returns NULL on error. Always sets 'fserror' global.
@@ -33,8 +43,7 @@ File open_file(char *name, FileMode mode) {
 // mode READ_WRITE. The current file position is set at byte 0.
 // Returns NULL on error. Always sets 'fserror' global.
 File create_file(char *name) {
-    fileEntry * testDirectoryRead = malloc((sizeof(fileEntry)*15)+2);
-    read_sd_block(testDirectoryRead, 1);
+    
 
     //ABLE TO READ FROM SOFTWARE DISK CORRECTLY
 
@@ -104,12 +113,42 @@ int delete_file(char *name){
 // determines if a file with 'name' exists and returns 1 if it exists, otherwise 0.
 // Always sets 'fserror' global.
 int file_exists(char *name){
-    fileEntry * testDirectoryRead = malloc((sizeof(fileEntry)*15)+2);
-    read_sd_block(testDirectoryRead, 1);
-    printf("\nThe first character of name is %c and should be A\n", testDirectoryRead[0].name[0]);
-    return 0;
     // see if file exists. FS_FILE_NOT_FOUND
     // check table entries to see if the name matches. if so, return 1.
+
+    //Check first five blocks to see if the file name matches
+    fileEntry * blockFileEntries = malloc((sizeof(fileEntry) * 15) + 2);
+    int matching, temp = 0;
+    int k;
+    int entryNameLength = 0;
+    for(int i = 1; i<=5; i++){
+        read_sd_block(blockFileEntries, i);
+        //check all 15 file entries in the ith block
+        for(int j = 0; j < 15; j++){
+            k = 0;
+            while(blockFileEntries[j].name[k] != 0 || k < 32){
+                if(name[k] == blockFileEntries[j].name[k]){
+                    temp++;
+                }
+                k++;
+            }
+            if(temp > matching){
+                //if the amount of matching characters is larger than all previous file entries then update matching
+                matching = temp;
+            }
+            temp = 0;
+        }
+    }
+    printf("matching is %d", matching);
+    if(matching == 32){
+        //if all 32 characters match then return file found
+        return 1;
+    }
+    else{
+        //if not all 32 characters match then file wasn't found
+        return 0;
+    }
+
 }
 
 // describe current filesystem error code by printing a descriptive message to standard

@@ -4,6 +4,8 @@
 #include "filesystem.h"
 
 int main(){
-    int ex = file_exists("filename");
+    int found;
+    found = file_exists("AAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+    printf("\nThe output of file_exists is %d", found);
     return 0;
 }
