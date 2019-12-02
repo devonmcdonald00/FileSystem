@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <stdbool.h>
 #include "softwaredisk.h"
 
 #define NUM_BLOCKS 5000
@@ -10,9 +11,6 @@
 
 typedef struct{
     short filesize;
-    short pos; // the current position (up to 27,648)
-    bool isOpen; // 1 if open. 0 if closed
-    bool write; // 1 if READ_WRITE. 0 if READ_ONLY
     short indirectBlock; // 1 indirect block (will hold value of a block number)
     short directBlocks[12]; //12 direct blocks
 }inode;
@@ -61,14 +59,11 @@ unsigned char * setupInodeBitmap(){
 
 
 inode * setupInodes(){
-    //inode type is 30.25 bytes
+    //inode type is 28 bytes
     inode * inodeEntries = malloc(sizeof(inode) * 15);
     inode temp;
     temp.filesize = 0; // file is empty initially (2 bytes)
     temp.indirectBlock = 0; // no indirect block intially (2 bytes)
-    temp.isOpen = 0; // file initially closed (1 bit)
-    temp.write = 1; // file implied READ_WRITE (1 bit)
-    temp.pos = 0; // current file position starts at 0 (2 bytes)
     for(int i = 0; i<12; i++){
         temp.directBlocks[i] = 0; // initialize 12 direct blocks to 0 (24 bytes)
     }
@@ -99,13 +94,14 @@ int main(){
 
     if(init == 1){
         //Init worked define metadata
-        printf("Initialization of the disk worked\n");
+        printf("Disk has been initialized...\n");
 
         //Define inode and data bitmaps (6th and 7th blocks respectively)
         unsigned char * inodeBitmap;
         unsigned char * dataBitmap;
         inodeBitmap = setupInodeBitmap();
         dataBitmap = setupDataBitmap();
+        printf("\nBitmaps setup...\n");
 
         unsigned char * testData = malloc(sizeof(char) * 512);
         write_sd_block(dataBitmap, 6); // block for data bitmap
@@ -122,7 +118,8 @@ int main(){
         fileEntry * testDirectoryRead = malloc((sizeof(fileEntry)*15)+2);
         read_sd_block(testDirectoryRead, 1);
 
-        printf("\nThe first character of name is %c and should be A\n", testDirectoryRead[0].name[0]);
+        printf("\nDirectory entries have been setup...\n");
+        //printf("\nThe first character of name is %c and should be A\n", testDirectoryRead[0].name[0]);
 
         //Define inode blocks
         inode * inputInodes = malloc((sizeof(inode)*15) + 92);
@@ -135,6 +132,7 @@ int main(){
         write_sd_block(inputInodes, 11); // 1 of 5 inode blocks
         write_sd_block(inputInodes, 12); // 1 of 5 inode blocks
 
+        printf("\n75 inodes have been setup...\n\nALL METADATA HAS BEEN SETUP\n");
         //All metadata finished
 
     }
