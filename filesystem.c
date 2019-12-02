@@ -12,6 +12,10 @@
 #define NUM_BLOCKS 5000
 #define BLOCK_SIZE 512
 
+typedef struct{
+    unsigned char name[32];
+    short inodeNumber;
+}fileEntry;
 
 // open existing file with pathname 'name' and access mode 'mode'.  Current file
 // position is set at byte 0.  Returns NULL on error. Always sets 'fserror' global.
@@ -29,6 +33,13 @@ File open_file(char *name, FileMode mode) {
 // mode READ_WRITE. The current file position is set at byte 0.
 // Returns NULL on error. Always sets 'fserror' global.
 File create_file(char *name) {
+    fileEntry * testDirectoryRead = malloc((sizeof(fileEntry)*15)+2);
+    read_sd_block(testDirectoryRead, 1);
+
+    //ABLE TO READ FROM SOFTWARE DISK CORRECTLY
+
+
+
     // check to see if filename already exists. FS_FILE_ALREADY_EXISTS
     // initialize directory table entry and link/create an inode
     // filename begins with NULL. FS_ILLEGAL_FILENAME
@@ -93,6 +104,10 @@ int delete_file(char *name){
 // determines if a file with 'name' exists and returns 1 if it exists, otherwise 0.
 // Always sets 'fserror' global.
 int file_exists(char *name){
+    fileEntry * testDirectoryRead = malloc((sizeof(fileEntry)*15)+2);
+    read_sd_block(testDirectoryRead, 1);
+    printf("\nThe first character of name is %c and should be A\n", testDirectoryRead[0].name[0]);
+    return 0;
     // see if file exists. FS_FILE_NOT_FOUND
     // check table entries to see if the name matches. if so, return 1.
 }
@@ -134,6 +149,7 @@ void fs_print_error(void){
 //     default:
 //         printf("SD: Unknown error code\n");
 //   }
+    printf("hello world");
 }
 
 // filesystem error code set (set by each filesystem function)
