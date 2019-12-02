@@ -20,12 +20,17 @@ typedef struct{
 }fileEntry;
 
 typedef struct FileInternals {
+    char * name;
     short pos;
-    bool mode; 
+    FileMode mode; 
     bool open; //0 if closed, 1 if open
     fileEntry cacheFileEntry;
     short blockNum;
 } FileInternals;
+
+FSError error = FS_NONE;
+
+FileInternals * fileArray[75];
 
 // open existing file with pathname 'name' and access mode 'mode'.  Current file
 // position is set at byte 0.  Returns NULL on error. Always sets 'fserror' global.
@@ -43,15 +48,19 @@ File open_file(char *name, FileMode mode) {
 // mode READ_WRITE. The current file position is set at byte 0.
 // Returns NULL on error. Always sets 'fserror' global.
 File create_file(char *name) {
-    
 
     //ABLE TO READ FROM SOFTWARE DISK CORRECTLY
-
-
 
     // check to see if filename already exists. FS_FILE_ALREADY_EXISTS
     // initialize directory table entry and link/create an inode
     // filename begins with NULL. FS_ILLEGAL_FILENAME
+
+    if(file_exists(name) == 0){
+
+    }
+    else{
+        error = FS_FILE_ALREADY_EXISTS;
+    }
 }
 
 
@@ -153,42 +162,41 @@ int file_exists(char *name){
 
 // describe current filesystem error code by printing a descriptive message to standard
 // error.
-void fs_print_error(void){
-//     switch (fserror) {
-//     case FS_NONE:
-//         printf("FS: No error.\n");
-//         break;
-//     case FS_OUT_OF_SPACE:
-//         printf("FS: The operation caused the software disk to fill up.\n");
-//         break;
-//     case FS_FILE_NOT_OPEN:
-//         printf("FS: Attempted read/write/close/etc. on file that isn’t open.\n");
-//         break;
-//     case FS_FILE_OPEN:
-//         printf("FS: File is already open.\n");
-//         break;
-//     case FS_FILE_NOT_FOUND:
-//         printf("FS: Attempted open or delete of file that doesn’t exist.\n");
-//         break;
-//     case FS_FILE_READ_ONLY:
-//         printf("FS: Attempted write to file opened for READ_ONLY.\n");
-//         break;
-//     case FS_FILE_ALREADY_EXISTS:
-//         printf("FS: Attempted creation of file with existing name.\n");
-//         break;
-//     case FS_EXCEEDS_MAX_FILE_SIZE:
-//         printf("FS: Seek or write would exceed max file size.\n");
-//         break;
-//     case FS_ILLEGAL_FILENAME:
-//         printf("FS: Filename begins with a null character.\n");
-//         break;
-//     case FS_IO_ERROR:
-//         printf("FS: Something really bad happened.\n");
-//         break;
-//     default:
-//         printf("SD: Unknown error code\n");
-//   }
-    printf("hello world");
+void fs_print_error(){
+    switch (error) {
+    case FS_NONE:
+        printf("FS: No error.\n");
+        break;
+    case FS_OUT_OF_SPACE:
+        printf("FS: The operation caused the software disk to fill up.\n");
+        break;
+    case FS_FILE_NOT_OPEN:
+        printf("FS: Attempted read/write/close/etc. on file that isn’t open.\n");
+        break;
+    case FS_FILE_OPEN:
+        printf("FS: File is already open.\n");
+        break;
+    case FS_FILE_NOT_FOUND:
+        printf("FS: Attempted open or delete of file that doesn’t exist.\n");
+        break;
+    case FS_FILE_READ_ONLY:
+        printf("FS: Attempted write to file opened for READ_ONLY.\n");
+        break;
+    case FS_FILE_ALREADY_EXISTS:
+        printf("FS: Attempted creation of file with existing name.\n");
+        break;
+    case FS_EXCEEDS_MAX_FILE_SIZE:
+        printf("FS: Seek or write would exceed max file size.\n");
+        break;
+    case FS_ILLEGAL_FILENAME:
+        printf("FS: Filename begins with a null character.\n");
+        break;
+    case FS_IO_ERROR:
+        printf("FS: Something really bad happened.\n");
+        break;
+    default:
+        printf("SD: Unknown error code\n");
+  }
 }
 
 // filesystem error code set (set by each filesystem function)
