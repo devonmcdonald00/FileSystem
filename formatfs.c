@@ -10,7 +10,10 @@
 
 typedef struct{
     short filesize;
-    short indirectBlock; //1 indirect block (will hold value of a block number)
+    short pos; // the current position (up to 27,648)
+    bool isOpen; // 1 if open. 0 if closed
+    bool write; // 1 if READ_WRITE. 0 if READ_ONLY
+    short indirectBlock; // 1 indirect block (will hold value of a block number)
     short directBlocks[12]; //12 direct blocks
 }inode;
 
@@ -58,13 +61,16 @@ unsigned char * setupInodeBitmap(){
 
 
 inode * setupInodes(){
-    //inode type is 28 bytes
+    //inode type is 30.25 bytes
     inode * inodeEntries = malloc(sizeof(inode) * 15);
     inode temp;
-    temp.filesize = 0;
-    temp.indirectBlock = 0;
+    temp.filesize = 0; // file is empty initially (2 bytes)
+    temp.indirectBlock = 0; // no indirect block intially (2 bytes)
+    temp.isOpen = 0; // file initially closed (1 bit)
+    temp.write = 1; // file implied READ_WRITE (1 bit)
+    temp.pos = 0; // current file position starts at 0 (2 bytes)
     for(int i = 0; i<12; i++){
-        temp.directBlocks[i] = 0; // initialize 12 direct blocks to 0
+        temp.directBlocks[i] = 0; // initialize 12 direct blocks to 0 (24 bytes)
     }
     for(int i = 0; i<15; i++){
         inodeEntries[i] = temp; // 15 inodes per block
@@ -77,9 +83,9 @@ fileEntry * setupDirectoryEntries(){
     fileEntry * directoryEntries = malloc(sizeof(fileEntry) * 15);
     fileEntry temp;
     for(int i = 0; i<32 ; i++){
-        temp.name[i] = 0; // initialize 32 bytes for file name
+        temp.name[i] = 0; // initialize 32 bytes for file name. NULL
     }
-    temp.inodeNumber = 0;
+    temp.inodeNumber = 0; // initialize to 0 (2 bytes)
     for(int i = 0; i < 15; i++){
         directoryEntries[i] = temp; // 15 file entries per block
     }
