@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <strings.h>
 #include "filesystem.h"
+#include <stdbool.h>
 
-int main(){
-    int found;
-    found = file_exists("AAAAAAAAAAAAAAAAAAAAAAAAAAAA");
-    printf("\nThe output of file_exists is %d", found);
+int main(){    
+    create_file("new file");
+    create_file("another");
     return 0;
 }

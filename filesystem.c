@@ -19,13 +19,18 @@ typedef struct{
     short inodeNumber;
 }fileEntry;
 
+typedef struct{
+    short filesize;
+    short indirectBlock; // 1 indirect block (will hold value of a block number)
+    short directBlocks[12]; //12 direct blocks
+}inode;
+
 typedef struct FileInternals {
     char * name;
     short pos;
     FileMode mode; 
     bool open; //0 if closed, 1 if open
-    fileEntry cacheFileEntry;
-    short blockNum;
+    short inodeNum;
 } FileInternals;
 
 FSError error = FS_NONE;
@@ -55,11 +60,132 @@ File create_file(char *name) {
     // initialize directory table entry and link/create an inode
     // filename begins with NULL. FS_ILLEGAL_FILENAME
 
-    if(file_exists(name) == 0){
+    int exists = file_exists(name);
+    printf("\nANOTHER CREATION!!!!!!!!\n");
 
+    if(exists == 0){
+        //file doesn't exist so commence
+        //data bitmap at block 6 and inode bitmap is at block 7
+        int freeSpaceData = 0;
+        int freeSpaceInode = 0;
+        int blockCounter = 0;
+        int dataBlockStart = 0;
+        int inodeOffset = 0;
+        bool * dataBitmap = malloc(512);
+        short * inodeBitmap = malloc(512);
+
+        bool * data = malloc(512);
+        read_sd_block(dataBitmap, 6);
+        
+        while(freeSpaceData == 0){
+            for(int i = dataBlockStart; i<7+dataBlockStart; i++){
+                if(dataBitmap[i] == 0){
+                    blockCounter++;
+                }
+            }
+            if(blockCounter == 7){
+                //7 bytes are free meaning 56 blocks are free for space
+                freeSpaceData = 1;
+            }
+            else{
+                //These 7 bytes aren't free so move to the next 7
+                blockCounter = 0;
+                dataBlockStart+=7;;
+            }
+        }
+        printf("\nUpdating data bitmap... \n");
+        for(int i = dataBlockStart; i<7+dataBlockStart; i++){
+            //mark all bits of the byte as taken;
+            // 11111111
+            printf("\ndata reserved at %d\n", i);
+            dataBitmap[i] = 1;
+        }
+        //dataBlockStart is now where the inode must link to 
+
+        if(freeSpaceData == 0){
+            //space is full
+            error = FS_OUT_OF_SPACE;
+            return NULL;
+        }
+        else{
+            write_sd_block(dataBitmap, 6);
+        }
+        //Now find free inode
+        read_sd_block(inodeBitmap, 7);
+        for(int i = inodeOffset; i<75; i++){
+            if(inodeBitmap[i] == 0){
+                //bit in the ith position is low
+                if(freeSpaceInode == 0){
+                    inodeOffset = i;
+                    //mark as taken in bitmap
+                    inodeBitmap[i] = 1;
+                    freeSpaceInode = 1;
+                    printf("\nNew inode at %d\n", i);
+                }
+            }
+        }
+        
+        if(inodeOffset == 75){
+            error = FS_OUT_OF_SPACE;
+            return NULL;
+        }
+        else{
+            printf("\nUpdating inode bitmap... \n");
+            write_sd_block(inodeBitmap, 7);
+
+        }
+        //now have inode offset and start block
+        //Create inode
+        inode newInode;
+        newInode.filesize = 0;
+        //metadata ends at block 13
+        for(int i = 0; i<12; i++){
+            newInode.directBlocks[i] = dataBlockStart+13+i;
+        }
+        printf("\nInode offset is %d and data block offset is %d\n", inodeOffset, dataBlockStart);
+        
+        newInode.indirectBlock = dataBlockStart+13+12;
+        //bitmaps marked and inode created now update data
+        //narrow down which block free inode is in
+        inode * inputInodes = malloc((sizeof(inode)*15) + 92);
+        if(inodeOffset < 15){
+            read_sd_block(inputInodes, 8);
+            inputInodes[inodeOffset] = newInode;
+        }
+        else if(inodeOffset < 30 && inodeOffset >= 15){
+            read_sd_block(inputInodes, 9);
+            inputInodes[inodeOffset-15] = newInode;
+        }
+        else if(inodeOffset < 45 && inodeOffset >= 30){
+            read_sd_block(inputInodes, 10);
+            inputInodes[inodeOffset-30] = newInode;
+        }
+        else if(inodeOffset < 60 && inodeOffset >= 45){
+            read_sd_block(inputInodes, 11);
+            inputInodes[inodeOffset-45] = newInode;
+        }
+        else if(inodeOffset < 75 && inodeOffset >= 60){
+            read_sd_block(inputInodes, 12);
+            inputInodes[inodeOffset-60] = newInode;
+        }
+
+        File newfile = malloc(sizeof(File));
+        newfile->name = name;
+        newfile->pos = 0;
+        newfile->mode = 0; 
+        newfile->open = 0;
+        newfile->inodeNum = inodeOffset;
+
+        free(dataBitmap);
+        free(inodeBitmap);
+
+        return newfile;
+        
+        //no data yet so no need to do anything with data blocks
     }
     else{
         error = FS_FILE_ALREADY_EXISTS;
+        return NULL;
     }
 }
 
@@ -124,8 +250,8 @@ int delete_file(char *name){
 int file_exists(char *name){
     // see if file exists. FS_FILE_NOT_FOUND
     // check table entries to see if the name matches. if so, return 1.
-
     //Check first five blocks to see if the file name matches
+    printf("right here");
     fileEntry * blockFileEntries = malloc((sizeof(fileEntry) * 15) + 2);
     int matching, temp = 0;
     int k;
@@ -148,12 +274,13 @@ int file_exists(char *name){
             temp = 0;
         }
     }
-    printf("matching is %d", matching);
     if(matching == 32){
+        free(blockFileEntries);
         //if all 32 characters match then return file found
         return 1;
     }
     else{
+        free(blockFileEntries);
         //if not all 32 characters match then file wasn't found
         return 0;
     }

@@ -22,8 +22,8 @@ typedef struct{
 }fileEntry;
 
 
-unsigned char * setupDataBitmap(){
-    unsigned char *dataBitmap = malloc(sizeof(char) * BLOCK_SIZE);
+bool * setupDataBitmap(){
+    bool *dataBitmap = malloc(sizeof(char) * BLOCK_SIZE + 448);
     //75 inodes requires 80 bits so need 10 bytes
     for(int i = 0; i < BLOCK_SIZE; i++){
         //initialize to all zeros
@@ -40,11 +40,11 @@ unsigned char * setupDataBitmap(){
     return dataBitmap;
 }
 
-unsigned char * setupInodeBitmap(){
-    unsigned char *inodeBitmap = malloc(sizeof(char) * BLOCK_SIZE);
+short * setupInodeBitmap(){
+    short *inodeBitmap = malloc(sizeof(short) * 75 + 362);
     //75 inodes requires 80 bits so need 10 bytes
     //However there we have to go all the way up to the size of the block
-    for(int i = 0; i < BLOCK_SIZE; i++){
+    for(int i = 0; i < 75; i++){
         //initialize to all zeros
         inodeBitmap[i] = 0;
     }
@@ -97,8 +97,8 @@ int main(){
         printf("Disk has been initialized...\n");
 
         //Define inode and data bitmaps (6th and 7th blocks respectively)
-        unsigned char * inodeBitmap;
-        unsigned char * dataBitmap;
+        short * inodeBitmap = malloc(sizeof(short)*75+362);
+        bool * dataBitmap = malloc(sizeof(bool)*BLOCK_SIZE+448);
         inodeBitmap = setupInodeBitmap();
         dataBitmap = setupDataBitmap();
         printf("\nBitmaps setup...\n");
@@ -141,6 +141,5 @@ int main(){
         //printf("Error with init");
         sd_print_error();
     }
-
     return 0;
 }
