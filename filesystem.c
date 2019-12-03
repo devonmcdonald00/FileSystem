@@ -243,8 +243,83 @@ void close_file(File file) {
 // 'fserror' global.
 unsigned long read_file(File file, void *buf, unsigned long numbytes){
     // see if file exists. FS_FILE_NOT_FOUND
+    if(file_exists(file->name) == 0){
+        error = FS_FILE_NOT_FOUND;
+        return 0;
+    }
     // see if file is open. FS_FILE_NOT_OPEN
+    if (file->open == 0){
+        error = FS_FILE_NOT_OPEN;
+        return 0;
+    }
     // look through file. iterate through blocks until numbytes is done
+    // use the file's inode number to go to that block, then read that block
+    // to find the inod
+    inode temp;
+    int inodeOffset = file->inodeNum; // get the inode number of the file
+    inode * inputInodes = malloc((sizeof(inode)*15) + 92);
+    // go to inode blocks and set temp equal to the desired inode
+    if(inodeOffset < 15){
+        read_sd_block(inputInodes, 8);
+        for (int i=0; i < 12; i++){
+            temp.directBlocks[i] = inputInodes[inodeOffset].directBlocks[i];
+        }
+        temp.indirectBlock = inputInodes[inodeOffset].indirectBlock;
+        temp.filesize = inputInodes[inodeOffset].filesize;
+    }
+    else if(inodeOffset < 30 && inodeOffset >= 15){
+        read_sd_block(inputInodes, 9);
+        for (int i=0; i < 12; i++){
+            temp.directBlocks[i] = inputInodes[inodeOffset-15].directBlocks[i];
+        }
+        temp.indirectBlock = inputInodes[inodeOffset-15].indirectBlock;
+        temp.filesize = inputInodes[inodeOffset-15].filesize;
+    }
+    else if(inodeOffset < 45 && inodeOffset >= 30){
+        read_sd_block(inputInodes, 10);
+        for (int i=0; i < 12; i++){
+            temp.directBlocks[i] = inputInodes[inodeOffset-30].directBlocks[i];
+        }
+        temp.indirectBlock = inputInodes[inodeOffset-30].indirectBlock;
+        temp.filesize = inputInodes[inodeOffset-30].filesize;
+    }
+    else if(inodeOffset < 60 && inodeOffset >= 45){
+        read_sd_block(inputInodes, 11);
+        for (int i=0; i < 12; i++){
+            temp.directBlocks[i] = inputInodes[inodeOffset-45].directBlocks[i];
+        }
+        temp.indirectBlock = inputInodes[inodeOffset-45].indirectBlock;
+        temp.filesize = inputInodes[inodeOffset-45].filesize;
+    }
+    else if(inodeOffset < 75 && inodeOffset >= 60){
+        read_sd_block(inputInodes, 12);
+        for (int i=0; i < 12; i++){
+            temp.directBlocks[i] = inputInodes[inodeOffset-60].directBlocks[i];
+        }
+        temp.indirectBlock = inputInodes[inodeOffset-60].indirectBlock;
+        temp.filesize = inputInodes[inodeOffset-60].filesize;
+    }
+    // at this point, our inode temp should have the properties needed
+    int current_block = file.pos / 512; // find current block of pos in file
+    int position = file.pos - (512*current_block); // current position in that block
+    int needed_block = temp.directBlocks[current_block]; // set needed_block to the block number
+    if (current_block > 11){
+        needed_block = temp.indirectBlock + cuurent_block - 11; // offset of indirectBlock
+    }
+    char* temp_buf[512]; // allocate temp_buf to have 512 bytes
+    buf = malloc(numbytes); // allocate the buf to be numbytes in length
+    read_sd_block(temp_buf,needed_block); // put the characters of the needed block in the temp_buf
+    int bytes_read = 0; // this will be returned and is a counter
+    for (int i = 0; i < numbytes; i++){
+        if (temp_buf[position+i] != NULL){
+            buf[i] = temp_buf[position+i] 
+            bytes_read++;
+        } 
+        else {
+            error = FS_NONE;
+            return bytes_read; // return the number of bytes read
+        }
+    }
 }
 
 // write 'numbytes' of data from 'buf' into 'file' at the current file position. 
