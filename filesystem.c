@@ -29,7 +29,7 @@ typedef struct FileInternals {
     char * name;
     int size;
     short pos;
-    FileMode mode; 
+    FileMode mode; // 0 if READ_ONLY, 1 if READ_WRITE
     bool open; //0 if closed, 1 if open
     short inodeNum;
 } FileInternals;
@@ -60,7 +60,9 @@ File open_file(char *name, FileMode mode) {
                 return NULL;
             }
             else{
-                fileArray[i]->open = 1;
+                fileArray[i]->open = 1; // file is now open
+                fileArray[i]->pos = 0; // set current pos to 0
+                fileArray[i]->mode = mode; // set FileMode to mode
                 return fileArray[i];
             }
         }
@@ -185,11 +187,12 @@ File create_file(char *name) {
             read_sd_block(inputInodes, 12);
             inputInodes[inodeOffset-60] = newInode;
         }
-
+        // need to check if name starts with a NULL CHARACTER
+        
         File newfile = malloc(sizeof(File));
         newfile->name = name;
         newfile->pos = 0;
-        newfile->mode = 0; 
+        newfile->mode = 'READ_WRITE'; 
         newfile->open = 0;
         newfile->size = 0;
         newfile->inodeNum = inodeOffset;
@@ -280,6 +283,7 @@ int seek_file(File file, unsigned long bytepos){
     }
     else{
         file->pos = bytepos;
+        // we need to extend file to new blocks if bytepos exceeds file_length
     }
 }
 
