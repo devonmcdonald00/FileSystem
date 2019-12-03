@@ -243,6 +243,8 @@ void close_file(File file) {
 // 'fserror' global.
 unsigned long read_file(File file, void *buf, unsigned long numbytes){
     // see if file exists. FS_FILE_NOT_FOUND
+    char * buffer;
+    buffer = (char *)buf;
     if(file_exists(file->name) == 0){
         error = FS_FILE_NOT_FOUND;
         return 0;
@@ -300,19 +302,19 @@ unsigned long read_file(File file, void *buf, unsigned long numbytes){
         temp.filesize = inputInodes[inodeOffset-60].filesize;
     }
     // at this point, our inode temp should have the properties needed
-    int current_block = file.pos / 512; // find current block of pos in file
-    int position = file.pos - (512*current_block); // current position in that block
+    int current_block = file->pos / 512; // find current block of pos in file
+    int position = file->pos - (512*current_block); // current position in that block
     int needed_block = temp.directBlocks[current_block]; // set needed_block to the block number
     if (current_block > 11){
-        needed_block = temp.indirectBlock + cuurent_block - 11; // offset of indirectBlock
+        needed_block = temp.indirectBlock + current_block - 11; // offset of indirectBlock
     }
-    char* temp_buf[512]; // allocate temp_buf to have 512 bytes
+    char* temp_buf = malloc(sizeof(char) * 512); // allocate temp_buf to have 512 bytes
     buf = malloc(numbytes); // allocate the buf to be numbytes in length
     read_sd_block(temp_buf,needed_block); // put the characters of the needed block in the temp_buf
     int bytes_read = 0; // this will be returned and is a counter
     for (int i = 0; i < numbytes; i++){
-        if (temp_buf[position+i] != NULL){
-            buf[i] = temp_buf[position+i] 
+        if (temp_buf[position+i] != 0){
+            buffer[i] = temp_buf[position+i];
             bytes_read++;
         } 
         else {
@@ -320,6 +322,8 @@ unsigned long read_file(File file, void *buf, unsigned long numbytes){
             return bytes_read; // return the number of bytes read
         }
     }
+    error = FS_NONE;
+    return bytes_read;
 }
 
 // write 'numbytes' of data from 'buf' into 'file' at the current file position. 
@@ -331,6 +335,22 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
     // see if file is read only. FS_FILE_READ_ONLY
     // will write exceed max size. FS_EXCEEDS_MAX_FILE_SIZE
     // look through file and write at cuurent position. create new block if needed.
+
+    if(file_exists(file->name) == 0){
+        error = FS_FILE_NOT_FOUND;
+    }
+    else if(file->pos + numbytes > 28672){
+        error = FS_EXCEEDS_MAX_FILE_SIZE;
+    }
+    else if(file->mode == READ_ONLY){
+        error = FS_FILE_READ_ONLY;
+    }
+    else if(file->open == 0){
+        error = FS_FILE_NOT_OPEN;
+    }
+    else{
+        
+    }
 }
 
 // sets current position in file to 'bytepos', always relative to the
