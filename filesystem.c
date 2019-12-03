@@ -349,6 +349,57 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
         error = FS_FILE_NOT_OPEN;
     }
     else{
+        inode temp;
+        int inodeOffset = file->inodeNum; // get the inode number of the file
+        inode * inputInodes = malloc((sizeof(inode)*15) + 92);
+        // go to inode blocks and set temp equal to the desired inode
+        if(inodeOffset < 15){
+            read_sd_block(inputInodes, 8);
+            for (int i=0; i < 12; i++){
+                temp.directBlocks[i] = inputInodes[inodeOffset].directBlocks[i];
+            }
+            temp.indirectBlock = inputInodes[inodeOffset].indirectBlock;
+            temp.filesize = inputInodes[inodeOffset].filesize;
+        }
+        else if(inodeOffset < 30 && inodeOffset >= 15){
+            read_sd_block(inputInodes, 9);
+            for (int i=0; i < 12; i++){
+                temp.directBlocks[i] = inputInodes[inodeOffset-15].directBlocks[i];
+            }
+            temp.indirectBlock = inputInodes[inodeOffset-15].indirectBlock;
+            temp.filesize = inputInodes[inodeOffset-15].filesize;
+        }
+        else if(inodeOffset < 45 && inodeOffset >= 30){
+            read_sd_block(inputInodes, 10);
+            for (int i=0; i < 12; i++){
+                temp.directBlocks[i] = inputInodes[inodeOffset-30].directBlocks[i];
+            }
+            temp.indirectBlock = inputInodes[inodeOffset-30].indirectBlock;
+            temp.filesize = inputInodes[inodeOffset-30].filesize;
+        }
+        else if(inodeOffset < 60 && inodeOffset >= 45){
+            read_sd_block(inputInodes, 11);
+            for (int i=0; i < 12; i++){
+                temp.directBlocks[i] = inputInodes[inodeOffset-45].directBlocks[i];
+            }
+            temp.indirectBlock = inputInodes[inodeOffset-45].indirectBlock;
+            temp.filesize = inputInodes[inodeOffset-45].filesize;
+        }
+        else if(inodeOffset < 75 && inodeOffset >= 60){
+            read_sd_block(inputInodes, 12);
+            for (int i=0; i < 12; i++){
+                temp.directBlocks[i] = inputInodes[inodeOffset-60].directBlocks[i];
+            }
+            temp.indirectBlock = inputInodes[inodeOffset-60].indirectBlock;
+            temp.filesize = inputInodes[inodeOffset-60].filesize;
+        }
+
+        int current_block = file.pos / 512; // find current block of pos in file
+        int position = file.pos - (512*current_block); // current position in that block
+        int needed_block = temp.directBlocks[current_block]; // set needed_block to the block number
+        if (current_block > 11){
+            needed_block = temp.indirectBlock + cuurent_block - 11; // offset of indirectBlock
+        }
         
     }
 }
