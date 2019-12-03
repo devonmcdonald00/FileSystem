@@ -62,6 +62,7 @@ File open_file(char *name, FileMode mode) {
             else{
                 fileArray[i]->open = 1;
                 error = FS_NONE;
+                fileArray[i]->mode = mode;
                 return fileArray[i];
             }
         }
@@ -335,18 +336,23 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
     // see if file is read only. FS_FILE_READ_ONLY
     // will write exceed max size. FS_EXCEEDS_MAX_FILE_SIZE
     // look through file and write at cuurent position. create new block if needed.
-
+    char * bufTemp;
+    bufTemp = (char *)buf;
     if(file_exists(file->name) == 0){
         error = FS_FILE_NOT_FOUND;
+        return 0;
     }
     else if(file->pos + numbytes > 28672){
         error = FS_EXCEEDS_MAX_FILE_SIZE;
+        return 0;
     }
     else if(file->mode == READ_ONLY){
         error = FS_FILE_READ_ONLY;
+        return 0;
     }
     else if(file->open == 0){
         error = FS_FILE_NOT_OPEN;
+        return 0;
     }
     else{
         inode temp;
@@ -394,13 +400,29 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
             temp.filesize = inputInodes[inodeOffset-60].filesize;
         }
 
-        int current_block = file.pos / 512; // find current block of pos in file
-        int position = file.pos - (512*current_block); // current position in that block
+        int current_block = file->pos / 512; // find current block of pos in file
+        int position = file->pos - (512*current_block); // current position in that block
         int needed_block = temp.directBlocks[current_block]; // set needed_block to the block number
         if (current_block > 11){
-            needed_block = temp.indirectBlock + cuurent_block - 11; // offset of indirectBlock
+            needed_block = temp.indirectBlock + current_block - 11; // offset of indirectBlock
         }
-        
+
+        char * buf = malloc(512);
+        read_sd_block(buf, needed_block);
+        int j = 0;
+        for(int i = 0; i<512; i++){
+            if(i >= position){
+                buf[i] = bufTemp[j];
+                j++;
+            }
+        }
+
+        write_sd_block(buf, needed_block);
+        if (j > numbytes){
+            j = numbytes;
+        }
+        return j;
+
     }
 }
 
