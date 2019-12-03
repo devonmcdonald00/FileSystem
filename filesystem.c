@@ -29,7 +29,7 @@ typedef struct FileInternals {
     char * name;
     int size;
     short pos;
-    FileMode mode; // 0 if READ_ONLY, 1 if READ_WRITE
+    FileMode mode; 
     bool open; //0 if closed, 1 if open
     short inodeNum;
 } FileInternals;
@@ -60,9 +60,8 @@ File open_file(char *name, FileMode mode) {
                 return NULL;
             }
             else{
-                fileArray[i]->open = 1; // file is now open
-                fileArray[i]->pos = 0; // set current pos to 0
-                fileArray[i]->mode = mode; // set FileMode to mode
+                fileArray[i]->open = 1;
+                error = FS_NONE;
                 return fileArray[i];
             }
         }
@@ -97,23 +96,23 @@ File create_file(char *name) {
         read_sd_block(dataBitmap, 6);
         
         while(freeSpaceData == 0){
-            for(int i = dataBlockStart; i<7+dataBlockStart; i++){
+            for(int i = dataBlockStart; i<53+dataBlockStart; i++){
                 if(dataBitmap[i] == 0){
                     blockCounter++;
                 }
             }
-            if(blockCounter == 7){
+            if(blockCounter == 53){
                 //7 bytes are free meaning 56 blocks are free for space
                 freeSpaceData = 1;
             }
             else{
                 //These 7 bytes aren't free so move to the next 7
                 blockCounter = 0;
-                dataBlockStart+=7;;
+                dataBlockStart+=53;;
             }
         }
         printf("\nUpdating data bitmap... \n");
-        for(int i = dataBlockStart; i<7+dataBlockStart; i++){
+        for(int i = dataBlockStart; i<53+dataBlockStart; i++){
             //mark all bits of the byte as taken;
             // 11111111
             printf("\ndata reserved at %d\n", i);
@@ -187,12 +186,11 @@ File create_file(char *name) {
             read_sd_block(inputInodes, 12);
             inputInodes[inodeOffset-60] = newInode;
         }
-        // need to check if name starts with a NULL CHARACTER
-        
+
         File newfile = malloc(sizeof(File));
         newfile->name = name;
         newfile->pos = 0;
-        newfile->mode = 'READ_WRITE'; 
+        newfile->mode = 0; 
         newfile->open = 0;
         newfile->size = 0;
         newfile->inodeNum = inodeOffset;
@@ -202,6 +200,8 @@ File create_file(char *name) {
         free(dataBitmap);
         free(inodeBitmap);
         free(inputInodes);
+
+        error = FS_NONE;
 
         return newfile;
         
@@ -231,6 +231,7 @@ void close_file(File file) {
             }
             else{
                 fileArray[i]->open = 0;
+                error = FS_NONE;
             }
         }
     }
@@ -282,8 +283,9 @@ int seek_file(File file, unsigned long bytepos){
         return 0;
     }
     else{
+        error = FS_NONE;
         file->pos = bytepos;
-        // we need to extend file to new blocks if bytepos exceeds file_length
+        return 1;
     }
 }
 
@@ -303,6 +305,7 @@ unsigned long file_length(File file){
         return 0;
     }
     else{
+        error = FS_NONE;
         return file->size;
     }
 }
@@ -314,6 +317,158 @@ int delete_file(char *name){
     // see if file isopen. FS_FILE_OPEN
     // free up all blocks of data connected to that file
     // remove the directory entry. free inodes too.
+
+    if(file_exists(name) == 0){
+        error = FS_FILE_NOT_FOUND;
+        return 0;
+    }
+    else{
+            short inodeOffset = 0;
+            unsigned char * clearBuf = malloc(sizeof(char) * 512);
+            for(int i = 0; i<512; i++){
+                clearBuf[i] = 0;
+            }
+            
+            File fileTemp1;
+            File fileTemp2;
+
+            inode temp;
+            
+            temp.filesize = 0; // file is empty initially (2 bytes)
+            temp.indirectBlock = 0; // no indirect block intially (2 bytes)
+            for(int i = 0; i<12; i++){
+                temp.directBlocks[i] = 0; // initialize 12 direct blocks to 0 (24 bytes)
+            }
+            int blockNum = 0;
+            inode * inputInodes = malloc((sizeof(inode)*15) + 92);
+            for(int i = 0; i<fileCount; i++){
+                if(fileArray[i]->name == name){
+                    if(fileArray[i]->open == 1){
+                        error = FS_FILE_OPEN;
+                        return 0;
+                    }
+                    else{
+                        inodeOffset = fileArray[i]->inodeNum;
+                        
+                        if(inodeOffset < 15){
+                            read_sd_block(inputInodes, 8);
+                            for(int i = 0; i<12; i++){
+                                inputInodes[inodeOffset].directBlocks[i] = blockNum;
+                                write_sd_block(clearBuf, blockNum);
+                            }
+                            //indirect and pointers
+                            for(int i = inputInodes[inodeOffset].directBlocks[11]+1; i <= inputInodes[inodeOffset].directBlocks[11]+42; i++){
+                                //go from indirect block to all pointers and write clear buffer to them
+                                write_sd_block(clearBuf, i);
+                            }
+                            inputInodes[inodeOffset] = temp;
+                            write_sd_block(inputInodes, 11);
+                            for(int j = i; j < fileCount-1; j++){
+                                //delete entry by overwritting it with files to the right
+                                fileArray[j] = fileArray[j+1];
+                            }
+                            fileCount--;
+                            error = FS_NONE;
+                            return 1;
+                        }
+                        else if(inodeOffset < 30 && inodeOffset >= 15){
+                            read_sd_block(inputInodes, 9);
+                            for(int i = 0; i<12; i++){
+                                inputInodes[inodeOffset-15].directBlocks[i] = blockNum;
+                                write_sd_block(clearBuf, blockNum);
+                            }
+                            //indirect and pointers
+                            for(int i = inputInodes[inodeOffset-15].directBlocks[11]+1; i <= inputInodes[inodeOffset-15].directBlocks[11]+42; i++){
+                                //go from indirect block to all pointers and write clear buffer to them
+                                write_sd_block(clearBuf, i);
+                            }
+                            inputInodes[inodeOffset-15] = temp;
+                            write_sd_block(inputInodes, 11);
+                            for(int j = i; j < fileCount-1; j++){
+                                //delete entry by overwritting it with files to the right
+                                fileArray[j] = fileArray[j+1];
+                            }
+                            fileCount--;
+                            error = FS_NONE;
+                            return 1;
+                        }
+                        else if(inodeOffset < 45 && inodeOffset >= 30){
+                            read_sd_block(inputInodes, 10);
+                            for(int i = 0; i<12; i++){
+                                inputInodes[inodeOffset-30].directBlocks[i] = blockNum;
+                                write_sd_block(clearBuf, blockNum);
+                            }
+                            //indirect and pointers
+                            for(int i = inputInodes[inodeOffset-30].directBlocks[11]+1; i <= inputInodes[inodeOffset-30].directBlocks[11]+42; i++){
+                                //go from indirect block to all pointers and write clear buffer to them
+                                write_sd_block(clearBuf, i);
+                            }
+
+                            inputInodes[inodeOffset-30] = temp;
+                            write_sd_block(inputInodes, 11);
+                            for(int j = i; j < fileCount-1; j++){
+                                //delete entry by overwritting it with files to the right
+                                fileArray[j] = fileArray[j+1];
+                            }
+                            fileCount--;
+
+
+                            error = FS_NONE;
+                            return 1;
+                        }
+                        else if(inodeOffset < 60 && inodeOffset >= 45){
+                            read_sd_block(inputInodes, 11);
+                            for(int i = 0; i<12; i++){
+                                inputInodes[inodeOffset-45].directBlocks[i] = blockNum;
+                                write_sd_block(clearBuf, blockNum);
+                            }
+                            //indirect and pointers
+                            for(int i = inputInodes[inodeOffset-45].directBlocks[11]+1; i <= inputInodes[inodeOffset-45].directBlocks[11]+42; i++){
+                                //go from indirect block to all pointers and write clear buffer to them
+                                write_sd_block(clearBuf, i);
+                            }
+                            error = FS_NONE;
+                            //clear inode
+                            inputInodes[inodeOffset-45] = temp;
+                            write_sd_block(inputInodes, 11);
+                            for(int j = i; j < fileCount-1; j++){
+                                //delete entry by overwritting it with files to the right
+                                fileArray[j] = fileArray[j+1];
+                            }
+                            fileCount--;
+                            
+                            return 1;
+                        }
+                        else if(inodeOffset < 75 && inodeOffset >= 60){
+                            read_sd_block(inputInodes, 12);
+                            for(int i = 0; i<12; i++){
+                                inputInodes[inodeOffset-60].directBlocks[i] = blockNum;
+                                write_sd_block(clearBuf, blockNum);
+                            }
+                            //indirect and pointers
+                            for(int i = inputInodes[inodeOffset-60].directBlocks[11]+1; i <= inputInodes[inodeOffset-60].directBlocks[11]+42; i++){
+                                //go from indirect block to all pointers and write clear buffer to them
+                                write_sd_block(clearBuf, i);
+                            }
+                            inputInodes[inodeOffset-60] = temp;
+                            write_sd_block(inputInodes, 11);
+                            for(int j = i; j < fileCount-1; j++){
+                                //delete entry by overwritting it with files to the right
+                                fileArray[j] = fileArray[j+1];
+                            }
+                            fileCount--;
+
+                            error = FS_NONE;
+                            return 1;
+                        }
+                    }
+                }
+            }
+    }
+    
+
+
+    
 }
 
 // determines if a file with 'name' exists and returns 1 if it exists, otherwise 0.
@@ -358,12 +513,12 @@ int file_exists(char *name){
                 return 1;
             }
         }
-        error = FS_FILE_NOT_FOUND;
+        //error = FS_FILE_NOT_FOUND;
         return 0;
 
     }
     else{
-        error = FS_FILE_NOT_FOUND;
+        //error = FS_FILE_NOT_FOUND;
         return 0;
     }
     
