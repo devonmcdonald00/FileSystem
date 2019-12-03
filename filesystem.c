@@ -27,6 +27,7 @@ typedef struct{
 
 typedef struct FileInternals {
     char * name;
+    int size;
     short pos;
     FileMode mode; 
     bool open; //0 if closed, 1 if open
@@ -35,7 +36,8 @@ typedef struct FileInternals {
 
 FSError error = FS_NONE;
 
-FileInternals * fileArray[75];
+File fileArray[75];
+int fileCount = 0;
 
 // open existing file with pathname 'name' and access mode 'mode'.  Current file
 // position is set at byte 0.  Returns NULL on error. Always sets 'fserror' global.
@@ -46,6 +48,23 @@ File open_file(char *name, FileMode mode) {
     // test if file is already open. FS_FILE_OPEN
     // set current position to byte 0 by going to first block
     // traverse through the inode to get to first block
+    if(file_exists(name) == 0){
+        error = FS_FILE_NOT_FOUND;
+    }
+    for(int i = 0; i<=fileCount; i++){
+        if(strcmp(name, fileArray[i]->name) == 0){
+            //file found in array
+            if(fileArray[i]->open == 1){
+                //file aready open
+                error = FS_FILE_OPEN;
+                return NULL;
+            }
+            else{
+                fileArray[i]->open = 1;
+                return fileArray[i];
+            }
+        }
+    }
 }
 
 
@@ -59,22 +78,20 @@ File create_file(char *name) {
     // check to see if filename already exists. FS_FILE_ALREADY_EXISTS
     // initialize directory table entry and link/create an inode
     // filename begins with NULL. FS_ILLEGAL_FILENAME
-
     int exists = file_exists(name);
     printf("\nANOTHER CREATION!!!!!!!!\n");
 
+    int freeSpaceData = 0;
+    int freeSpaceInode = 0;
+    int blockCounter = 0;
+    int dataBlockStart = 0;
+    int inodeOffset = 0;
     if(exists == 0){
         //file doesn't exist so commence
         //data bitmap at block 6 and inode bitmap is at block 7
-        int freeSpaceData = 0;
-        int freeSpaceInode = 0;
-        int blockCounter = 0;
-        int dataBlockStart = 0;
-        int inodeOffset = 0;
+        
         bool * dataBitmap = malloc(512);
         short * inodeBitmap = malloc(512);
-
-        bool * data = malloc(512);
         read_sd_block(dataBitmap, 6);
         
         while(freeSpaceData == 0){
@@ -142,7 +159,7 @@ File create_file(char *name) {
         for(int i = 0; i<12; i++){
             newInode.directBlocks[i] = dataBlockStart+13+i;
         }
-        printf("\nInode offset is %d and data block offset is %d\n", inodeOffset, dataBlockStart);
+        //printf("\nInode offset is %d and data block offset is %d\n", inodeOffset, dataBlockStart);
         
         newInode.indirectBlock = dataBlockStart+13+12;
         //bitmaps marked and inode created now update data
@@ -174,10 +191,14 @@ File create_file(char *name) {
         newfile->pos = 0;
         newfile->mode = 0; 
         newfile->open = 0;
+        newfile->size = 0;
         newfile->inodeNum = inodeOffset;
+        fileArray[fileCount] = newfile;
+        fileCount++;
 
         free(dataBitmap);
         free(inodeBitmap);
+        free(inputInodes);
 
         return newfile;
         
@@ -195,6 +216,21 @@ void close_file(File file) {
     // see if file exists. FS_FILE_NOT_FOUND
     // see if file is open. FS_FILE_NOT_OPEN
     // set file attribute to closed
+    if(file_exists(file->name) == 0){
+        error = FS_FILE_NOT_FOUND;
+    }
+    for(int i = 0; i<=fileCount; i++){
+        if(strcmp(file->name, fileArray[i]->name) == 0){
+            //file found in array
+            if(fileArray[i]->open == 0){
+                //file aready open
+                error = FS_FILE_NOT_OPEN;
+            }
+            else{
+                fileArray[i]->open = 0;
+            }
+        }
+    }
 }
 
 // read at most 'numbytes' of data from 'file' into 'buf', starting at the 
@@ -227,6 +263,24 @@ int seek_file(File file, unsigned long bytepos){
     // see if file is open. FS_FILE_NOT_OPEN
     // will seek exceed max size. FS_EXCEEDS_MAX_FILE_SIZE
     // set current position to bytepos
+
+    //56 total blocks allowed per file
+    //equates to 28672 bytes
+    if(file_exists(file->name) == 0){
+        error = FS_FILE_NOT_FOUND;
+        return 0;
+    }
+    else if(file->open == 0){
+        error = FS_FILE_NOT_OPEN;
+        return 0;
+    }
+    else if(bytepos >= 28672){
+        error = FS_EXCEEDS_MAX_FILE_SIZE;
+        return 0;
+    }
+    else{
+        file->pos = bytepos;
+    }
 }
 
 // returns the current length of the file in bytes. Always sets 'fserror' global.
@@ -234,6 +288,19 @@ unsigned long file_length(File file){
     // see if file exists. FS_FILE_NOT_FOUND
     // see if file is open. FS_FILE_NOT_OPEN
     // traverse through file with a counter
+    printf("%s", file->name);
+    printf("%d file exists", file_exists(file->name));
+    if(file_exists(file->name) == 0){
+        error = FS_FILE_NOT_FOUND;
+        return 0;
+    }
+    else if(file->open == 0){
+        error = FS_FILE_NOT_OPEN;
+        return 0;
+    }
+    else{
+        return file->size;
+    }
 }
 
 // deletes the file named 'name', if it exists. Returns 1 on success, 0 on failure. 
@@ -251,39 +318,51 @@ int file_exists(char *name){
     // see if file exists. FS_FILE_NOT_FOUND
     // check table entries to see if the name matches. if so, return 1.
     //Check first five blocks to see if the file name matches
-    printf("right here");
-    fileEntry * blockFileEntries = malloc((sizeof(fileEntry) * 15) + 2);
-    int matching, temp = 0;
-    int k;
-    int entryNameLength = 0;
-    for(int i = 1; i<=5; i++){
-        read_sd_block(blockFileEntries, i);
-        //check all 15 file entries in the ith block
-        for(int j = 0; j < 15; j++){
-            k = 0;
-            while(blockFileEntries[j].name[k] != 0 || k < 32){
-                if(name[k] == blockFileEntries[j].name[k]){
-                    temp++;
-                }
-                k++;
+    // fileEntry blockFileEntries[15];
+    // int matching, temp = 0;
+    // int k;
+    // int entryNameLength = 0;
+    // for(int i = 1; i<=5; i++){
+    //     read_sd_block(blockFileEntries, i);
+    //     //check all 15 file entries in the ith block
+    //     for(int j = 0; j < 15; j++){
+    //         k = 0;
+    //         while(blockFileEntries[j].name[k] != 0 || k < 32){
+    //             if(name[k] == blockFileEntries[j].name[k]){
+    //                 temp++;
+    //             }
+    //             k++;
+    //         }
+    //         if(temp > matching){
+    //             //if the amount of matching characters is larger than all previous file entries then update matching
+    //             matching = temp;
+    //         }
+    //         temp = 0;
+    //     }
+    // }
+    // if(matching == 32){
+    //     //if all 32 characters match then return file found
+    //     return 1;
+    // }
+    // else{
+    //     //if not all 32 characters match then file wasn't found
+    //     return 0;
+    // }
+    if(fileCount != 0){
+        for(int i = 0; i<=fileCount; i++){
+            if(strcmp(fileArray[i]->name, name) == 0){
+                return 1;
             }
-            if(temp > matching){
-                //if the amount of matching characters is larger than all previous file entries then update matching
-                matching = temp;
-            }
-            temp = 0;
         }
-    }
-    if(matching == 32){
-        free(blockFileEntries);
-        //if all 32 characters match then return file found
-        return 1;
+        error = FS_FILE_NOT_FOUND;
+        return 0;
+
     }
     else{
-        free(blockFileEntries);
-        //if not all 32 characters match then file wasn't found
+        error = FS_FILE_NOT_FOUND;
         return 0;
     }
+    
 
 }
 
