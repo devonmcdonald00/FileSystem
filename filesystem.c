@@ -51,13 +51,13 @@ File open_file(char *name, FileMode mode) {
     if(file_exists(name) == 0){
         error = FS_FILE_NOT_FOUND;
     }
-    for(int i = 0; i<=fileCount; i++){
+    for(int i = 0; i<fileCount; i++){
         if(strcmp(name, fileArray[i]->name) == 0){
             //file found in array
             if(fileArray[i]->open == 1){
                 //file aready open
                 error = FS_FILE_OPEN;
-                return NULL;
+                return fileArray[i];
             }
             else{
                 fileArray[i]->open = 1;
@@ -82,16 +82,15 @@ File create_file(char *name) {
     // filename begins with NULL. FS_ILLEGAL_FILENAME
     int exists = file_exists(name);
     //printf("\nANOTHER CREATION!!!!!!!!\n");
-
-    int freeSpaceData = 0;
-    int freeSpaceInode = 0;
-    int blockCounter = 0;
-    int dataBlockStart = 0;
-    int inodeOffset = 0;
-    if(exists == 0){
+    
+    if(file_exists(name) == 0){
         //file doesn't exist so commence
         //data bitmap at block 6 and inode bitmap is at block 7
-        
+        int freeSpaceData = 0;
+        int freeSpaceInode = 0;
+        int blockCounter = 0;
+        int dataBlockStart = 0;
+        int inodeOffset = 0;
         bool * dataBitmap = malloc(512);
         short * inodeBitmap = malloc(512);
         read_sd_block(dataBitmap, 6);
@@ -210,7 +209,11 @@ File create_file(char *name) {
     }
     else{
         error = FS_FILE_ALREADY_EXISTS;
-        return NULL;
+        for(int i = 0; i<fileCount; i++){
+            if(fileArray[i]->name == name){
+                return fileArray[i];
+            }
+        }
     }
 }
 
@@ -786,7 +789,7 @@ int file_exists(char *name){
     //     return 0;
     // }
     if(fileCount != 0){
-        for(int i = 0; i<=fileCount; i++){
+        for(int i = 0; i<fileCount; i++){
             if(strcmp(fileArray[i]->name, name) == 0){
                 return 1;
             }
