@@ -81,7 +81,7 @@ File create_file(char *name) {
     // initialize directory table entry and link/create an inode
     // filename begins with NULL. FS_ILLEGAL_FILENAME
     int exists = file_exists(name);
-    printf("\nANOTHER CREATION!!!!!!!!\n");
+    //printf("\nANOTHER CREATION!!!!!!!!\n");
 
     int freeSpaceData = 0;
     int freeSpaceInode = 0;
@@ -112,11 +112,11 @@ File create_file(char *name) {
                 dataBlockStart+=53;;
             }
         }
-        printf("\nUpdating data bitmap... \n");
+        //printf("\nUpdating data bitmap... \n");
         for(int i = dataBlockStart; i<53+dataBlockStart; i++){
             //mark all bits of the byte as taken;
             // 11111111
-            printf("\ndata reserved at %d\n", i);
+            //printf("\ndata reserved at %d\n", i);
             dataBitmap[i] = 1;
         }
         //dataBlockStart is now where the inode must link to 
@@ -139,7 +139,7 @@ File create_file(char *name) {
                     //mark as taken in bitmap
                     inodeBitmap[i] = 1;
                     freeSpaceInode = 1;
-                    printf("\nNew inode at %d\n", i);
+                    //printf("\nNew inode at %d\n", i);
                 }
             }
         }
@@ -149,7 +149,7 @@ File create_file(char *name) {
             return NULL;
         }
         else{
-            printf("\nUpdating inode bitmap... \n");
+            //printf("\nUpdating inode bitmap... \n");
             write_sd_block(inodeBitmap, 7);
 
         }
@@ -191,8 +191,8 @@ File create_file(char *name) {
         File newfile = malloc(sizeof(File));
         newfile->name = name;
         newfile->pos = 0;
-        newfile->mode = 0; 
-        newfile->open = 0;
+        newfile->mode = READ_WRITE; 
+        newfile->open = 1;
         newfile->size = 0;
         newfile->inodeNum = inodeOffset;
         fileArray[fileCount] = newfile;
@@ -229,10 +229,12 @@ void close_file(File file) {
             if(fileArray[i]->open == 0){
                 //file aready open
                 error = FS_FILE_NOT_OPEN;
+                return;
             }
             else{
                 fileArray[i]->open = 0;
                 error = FS_NONE;
+                return;
             }
         }
     }
@@ -313,14 +315,26 @@ unsigned long read_file(File file, void *buf, unsigned long numbytes){
     buf = malloc(numbytes); // allocate the buf to be numbytes in length
     read_sd_block(temp_buf,needed_block); // put the characters of the needed block in the temp_buf
     int bytes_read = 0; // this will be returned and is a counter
-    for (int i = 0; i < numbytes; i++){
-        if (temp_buf[position+i] != 0){
+    int j = 0;
+    for (int i = 0; i < temp.filesize; i++){
+        if(i < 512){
             buffer[i] = temp_buf[position+i];
             bytes_read++;
-        } 
-        else {
-            error = FS_NONE;
-            return bytes_read; // return the number of bytes read
+        }
+        else{
+            if(j < 512){
+                buffer[i] = temp_buf[j];
+                bytes_read++;
+                j++;
+            }
+            else{
+                j = 0;
+                needed_block++;
+                if(needed_block == temp.indirectBlock){
+                    needed_block++;
+                }
+                read_sd_block(temp_buf, needed_block);
+            }
         }
     }
     error = FS_NONE;
@@ -451,6 +465,7 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
             }
             file->pos += j;
             temp.filesize += j;
+            file->size += j;
 
             //update inode with new file size
             if(inodeBlockNum = 1){
@@ -491,6 +506,7 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
             }
             file->pos += j;
             temp.filesize += j;
+            file->size += j;
 
             //update inode with new file size
             if(inodeBlockNum = 1){
@@ -558,8 +574,6 @@ unsigned long file_length(File file){
     // see if file exists. FS_FILE_NOT_FOUND
     // see if file is open. FS_FILE_NOT_OPEN
     // traverse through file with a counter
-    printf("%s", file->name);
-    printf("%d file exists", file_exists(file->name));
     if(file_exists(file->name) == 0){
         error = FS_FILE_NOT_FOUND;
         return 0;
