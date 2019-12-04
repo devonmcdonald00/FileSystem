@@ -304,7 +304,7 @@ unsigned long read_file(File file, void *buf, unsigned long numbytes){
     }
     // at this point, our inode temp should have the properties needed
     int current_block = file->pos / 512; // find current block of pos in file
-    int position = file->pos - (512*current_block); // current position in that block
+    int position = 0;//file->pos - (512*current_block); // current position in that block
     int needed_block = temp.directBlocks[current_block]; // set needed_block to the block number
     if (current_block > 11){
         needed_block = temp.indirectBlock + current_block - 11; // offset of indirectBlock
@@ -324,6 +324,9 @@ unsigned long read_file(File file, void *buf, unsigned long numbytes){
         }
     }
     error = FS_NONE;
+
+
+
     return bytes_read;
 }
 
@@ -359,6 +362,7 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
         int inodeOffset = file->inodeNum; // get the inode number of the file
         inode * inputInodes = malloc((sizeof(inode)*15) + 92);
         // go to inode blocks and set temp equal to the desired inode
+        int inodeBlockNum = 0;
         if(inodeOffset < 15){
             read_sd_block(inputInodes, 8);
             for (int i=0; i < 12; i++){
@@ -366,6 +370,7 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
             }
             temp.indirectBlock = inputInodes[inodeOffset].indirectBlock;
             temp.filesize = inputInodes[inodeOffset].filesize;
+            inodeBlockNum = 1;
         }
         else if(inodeOffset < 30 && inodeOffset >= 15){
             read_sd_block(inputInodes, 9);
@@ -374,6 +379,7 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
             }
             temp.indirectBlock = inputInodes[inodeOffset-15].indirectBlock;
             temp.filesize = inputInodes[inodeOffset-15].filesize;
+            inodeBlockNum = 2;
         }
         else if(inodeOffset < 45 && inodeOffset >= 30){
             read_sd_block(inputInodes, 10);
@@ -382,6 +388,7 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
             }
             temp.indirectBlock = inputInodes[inodeOffset-30].indirectBlock;
             temp.filesize = inputInodes[inodeOffset-30].filesize;
+            inodeBlockNum = 3;
         }
         else if(inodeOffset < 60 && inodeOffset >= 45){
             read_sd_block(inputInodes, 11);
@@ -390,6 +397,7 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
             }
             temp.indirectBlock = inputInodes[inodeOffset-45].indirectBlock;
             temp.filesize = inputInodes[inodeOffset-45].filesize;
+            inodeBlockNum = 4;
         }
         else if(inodeOffset < 75 && inodeOffset >= 60){
             read_sd_block(inputInodes, 12);
@@ -398,6 +406,7 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
             }
             temp.indirectBlock = inputInodes[inodeOffset-60].indirectBlock;
             temp.filesize = inputInodes[inodeOffset-60].filesize;
+            inodeBlockNum = 5;
         }
 
         int current_block = file->pos / 512; // find current block of pos in file
@@ -408,20 +417,107 @@ unsigned long write_file(File file, void *buf, unsigned long numbytes){
         }
 
         char * buf = malloc(512);
+        char * buf2 = malloc(512);
         read_sd_block(buf, needed_block);
         int j = 0;
-        for(int i = 0; i<512; i++){
-            if(i >= position){
+        int storeNumBytes = numbytes;
+        if(numbytes + file->pos > 512){
+            //split over another block
+            j = 0;
+            for(int i = file->pos; i<512; i++){
                 buf[i] = bufTemp[j];
                 j++;
+                numbytes--;
             }
-        }
+            write_sd_block(buf, needed_block);
 
-        write_sd_block(buf, needed_block);
-        if (j > numbytes){
-            j = numbytes;
+            //keep going to the next block until numbytes is 0
+            while(numbytes != 0){
+                needed_block++;
+                if(needed_block == temp.indirectBlock){
+                    //skip
+                    needed_block++;
+                }
+                else{
+                    read_sd_block(buf2, needed_block);
+                    for(int i = 0; i<512; i++){
+                        if(numbytes > 0){
+                            buf2[i] = bufTemp[j];
+                            j++;
+                            numbytes--;
+                        }
+                    }
+                }
+            }
+            file->pos += j;
+            temp.filesize += j;
+
+            //update inode with new file size
+            if(inodeBlockNum = 1){
+                inputInodes[inodeOffset] = temp;
+                write_sd_block(inputInodes, 8); 
+            }
+            else if(inodeBlockNum = 2){
+                inputInodes[inodeOffset-15] = temp;
+                write_sd_block(inputInodes, 9); 
+            }
+            else if(inodeBlockNum = 3){
+                inputInodes[inodeOffset-30] = temp;
+                write_sd_block(inputInodes, 10); 
+            }
+            else if(inodeBlockNum = 4){
+                inputInodes[inodeOffset-45] = temp;
+                write_sd_block(inputInodes, 10); 
+            }
+            else if(inodeBlockNum = 5){
+                inputInodes[inodeOffset-60] = temp;
+                write_sd_block(inputInodes, 11); 
+            }
+
+            error = FS_NONE;
+            return j;
         }
-        return j;
+        else{
+            for(int i = 0; i<512; i++){
+                if(i >= position && j < numbytes){
+                    buf[i] = bufTemp[j];
+                    j++;
+                }
+            }
+
+            write_sd_block(buf, needed_block);
+            if(j > numbytes){
+                j = numbytes;
+            }
+            file->pos += j;
+            temp.filesize += j;
+
+            //update inode with new file size
+            if(inodeBlockNum = 1){
+                inputInodes[inodeOffset] = temp;
+                write_sd_block(inputInodes, 8); 
+            }
+            else if(inodeBlockNum = 2){
+                inputInodes[inodeOffset-15] = temp;
+                write_sd_block(inputInodes, 9); 
+            }
+            else if(inodeBlockNum = 3){
+                inputInodes[inodeOffset-30] = temp;
+                write_sd_block(inputInodes, 10); 
+            }
+            else if(inodeBlockNum = 4){
+                inputInodes[inodeOffset-45] = temp;
+                write_sd_block(inputInodes, 10); 
+            }
+            else if(inodeBlockNum = 5){
+                inputInodes[inodeOffset-60] = temp;
+                write_sd_block(inputInodes, 11); 
+            }
+            error = FS_NONE;
+            return j;
+        }
+        
+        
 
     }
 }
