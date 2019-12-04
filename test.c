@@ -4,30 +4,88 @@
 #include "filesystem.h"
 
 // RUN formatfs before conducting this test!
-  
-int main(int argc, char *argv[]) {
-  int ret, i;
-  File f;
-  char buf[1024], buf2[1024];
 
-  // tests block alignment, along with testfs4a
-  
-  f=open_file("line-em-up", READ_WRITE);
-  printf("ret from open_file(\"line-em-up\", READ_WRITE) = %p\n",
+
+int main(int argc, char *argv[]) {
+  int ret;
+  File f;
+  char buf[1000];
+
+  // should fail, file doesn't exist
+  printf("ret from delete_file(\"blarg\") = %d\n",
+	 delete_file("blarg"));
+  fs_print_error();
+
+  // should fail, file doesn't exist
+  printf("ret from open_file(\"blarg\", READ_ONLY) = %p\n",
+	 open_file("blarg", READ_ONLY));
+  fs_print_error();
+
+  // should succeed
+  f=create_file("blarg");
+  printf("ret from create_file(\"blarg\") = %p\n",
+	 f);
+  fs_print_error();
+
+  // should succeed
+  close_file(f);
+  printf("Executed close_file(f).\n");
+  fs_print_error();
+
+  // should fail, file now exists
+  f=create_file("blarg");
+  printf("ret from create_file(\"blarg\") = %p\n",
 	 f);
   fs_print_error();
   
-  for (i=0; i < 50; i+=2) {
-    memset(buf,     'A'+i, 512);
-    memset(buf+512, 'A'+i+1, 512);
-    ret = read_file(f, buf2, 1024);
-    printf("ret from read_file(f, buf2, 1024) = %d\n",
-	   ret);
-    fs_print_error();
-    printf("Expected buffer value %s.\n",
-	 ! memcmp(buf, buf2, 1024) ? "matches" : "doesn't  match");
-  }
+  // should fail, file not open
+  close_file(f);
+  printf("Executed close_file(f).\n");
+  fs_print_error();
+  
+  // should succeed
+  f=open_file("blarg", READ_ONLY);
+  printf("ret from open_file(\"blarg\", READ_ONLY) = %p\n",
+	 f);
+  fs_print_error();
+  
+  // should fail, file is open for read-only
+  ret=write_file(f, "hello", strlen("hello"));
+  printf("ret from write_file(f, \"hello\", strlen(\"hello\") = %d\n",
+	 ret);
+  fs_print_error();
 
+  // should succeed
+  close_file(f);
+  printf("Executed close_file(f).\n");
+  fs_print_error();
+
+  // should succeed
+  f=open_file("blarg", READ_WRITE);
+  printf("ret from open_file(\"blarg\", READ_WRITE) = %p\n",
+	 f);
+  fs_print_error();
+  
+  // should succeed, file is now open for read-write
+  ret=write_file(f, "hello", strlen("hello"));
+  printf("ret from write_file(f, \"hello\", strlen(\"hello\") = %d\n",
+	 ret);
+  fs_print_error();
+ 
+  // should succeed
+  printf("Seeking to beginning of file.\n");
+  seek_file(f, 0);
+  fs_print_error();
+
+  // should succeed
+  bzero(buf, 1000);
+  ret=read_file(f, buf, strlen("hello"));
+  printf("ret from read_file(f, buf, strlen(\"hello\") = %d\n",
+	 ret);
+  printf("buf=\"%s\"\n", buf);
+  fs_print_error();
+
+  // should succeed
   close_file(f);
   printf("Executed close_file(f).\n");
   fs_print_error();
